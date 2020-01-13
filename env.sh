@@ -49,6 +49,10 @@ do
 done < ${absolute_path}/.default.env
 
 echo "}" >> ${env_config}
+sed -e "s/\//\\\/g" ${env_config}
+LINE=`echo $(cat ${env_config}) | sed 's#\/#\\\/#g'`
+mv ${absolute_path}/index.html ${absolute_path}/index.html.bak
+sed -e "s/window\.\_env\_.*\}\;/${LINE}/g" ${absolute_path}/index.html.bak > ${absolute_path}/index.html
 
 cat ${env_config}
 

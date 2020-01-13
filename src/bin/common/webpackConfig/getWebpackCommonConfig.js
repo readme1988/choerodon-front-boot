@@ -1,13 +1,16 @@
 import { join } from 'path';
 import webpack from 'webpack';
 import ExtractTextPlugin from 'extract-text-webpack-plugin';
+import FilterWarningsPlugin from 'webpack-filter-warnings-plugin';
 import CaseSensitivePathsPlugin from 'case-sensitive-paths-webpack-plugin';
 import FriendlyErrorsWebpackPlugin from 'friendly-errors-webpack-plugin';
-import UglifyJsPlugin from 'uglifyjs-webpack-plugin';
+import ParallelUglifyPlugin from 'webpack-parallel-uglify-plugin';
 import ThemeColorReplacer from 'webpack-theme-color-replacer';
+import HardSourceWebpackPlugin from 'hard-source-webpack-plugin';
 import chalk from 'chalk';
 import getBabelCommonConfig from './getBabelCommonConfig';
 import getTSCommonConfig from './getTSCommonConfig';
+import colorPalette from '../utils/colorPalette';
 import context from '../context';
 
 const jsFileName = 'dis/[name].[hash:8].js';
@@ -16,6 +19,8 @@ const cssFileName = 'dis/[name].[contenthash:8].css';
 const cssColorFileName = 'dis/theme-colors.css';
 const assetFileName = 'dis/assets/[name].[hash:8].[ext]';
 let processTimer;
+const baseColor = '#3f51b5';
+
 
 function getAssetLoader(env, mimetype, limit = 10000) {
   return {
@@ -34,6 +39,9 @@ export default function getWebpackCommonConfig(mode, env) {
   const tsOptions = getTSCommonConfig();
 
   const plugins = [
+    new FilterWarningsPlugin({
+      exclude: /.*@choerodon.*/,
+    }),
     new webpack.optimize.CommonsChunkPlugin({
       name: 'vendor',
       minChunks: Infinity,
@@ -81,30 +89,44 @@ export default function getWebpackCommonConfig(mode, env) {
     }),
     new ThemeColorReplacer({
       fileName: cssColorFileName,
-      matchColors: ['#3f51b5', '#303f9f'],
+      matchColors: [
+        colorPalette(baseColor, 1),
+        colorPalette(baseColor, 2),
+        colorPalette(baseColor, 3),
+        colorPalette(baseColor, 4),
+        colorPalette(baseColor, 5),
+        baseColor,
+        colorPalette(baseColor, 7),
+        colorPalette(baseColor, 8),
+        colorPalette(baseColor, 9),
+        colorPalette(baseColor, 10),
+        '#303f9f', // 左上角颜色
+        '140, 158, 255, 0.12', // menu-item背景
+        '140, 158, 255, 0.16', // 左侧菜单menu-item背景
+      ],
+      injectCss: true,
       isJsUgly: env !== 'development',
     }),
-    new ThemeColorReplacer({
-      fileName: cssColorFileName,
-      matchColors: ['#3f51b5', '#303f9f'],
-      isJsUgly: env !== 'development',
-    }),
+
   ];
 
   if (env === 'production') {
     plugins.push(
-      new webpack.LoaderOptionsPlugin({
-        minimize: true,
-      }),
-      new UglifyJsPlugin({
-        parallel: true,
-        cache: true,
-        uglifyOptions: {
+      // 这个会使ThemeColorReplacer无法替换rgba颜色，先去掉测试测试
+      // new webpack.LoaderOptionsPlugin({
+      //   minimize: true,
+      // }),
+      new ParallelUglifyPlugin({
+        uglifyJS: {
           output: {
             comments: false,
+            beautify: false,
           },
+          warnings: false,
           compress: {
-            warnings: false,
+            drop_console: true,
+            collapse_vars: true,
+            reduce_vars: true,
           },
         },
       }),
@@ -112,6 +134,7 @@ export default function getWebpackCommonConfig(mode, env) {
   } else {
     plugins.push(
       new webpack.HotModuleReplacementPlugin(),
+      new HardSourceWebpackPlugin(),
     );
   }
   return {
